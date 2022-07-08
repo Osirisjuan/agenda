@@ -1,4 +1,3 @@
-import logo from './logo.svg';
 import './App.css';
 /*Libresias externas */
 import axios from "axios";
@@ -15,13 +14,15 @@ class App extends Component {
   state={
       dataPersons:[], // eSTADO QUE ALMACENA LOS DATOS DE LA PERSONA
       formInsertar: false, //Estado que se ocupa para mostrar el formulario que inserta 
+      modalEliminar: false, 
       forms:{
           id: '',
           nombre: '',
           apellido: '',
           telefono: '',
           correo: '',
-          direccion: ''
+          direccion: '',
+          tipomodal: ''
      }
   }
  
@@ -32,7 +33,12 @@ class App extends Component {
   obtenerContactos=()=>{
     axios.get(baseUrl+'get_all_persons' ).then(response => {
        this.setState({dataPersons :response.data.items});
-       
+      /* 
+        console.log(response.data);
+       console.log("----------------------------");
+       console.log(response.data.items);   
+       console.log("----------------------------");
+      */
     }).catch(error=>{
       console.log(error.message);
     });
@@ -56,14 +62,13 @@ class App extends Component {
           V_ADDRES: this.state.forms.direccion
       } 
 
-  await  axios.post(baseUrl+'/create_contact_agent', body ).then(response=>{
-      this.showModalInsertar();
-      this.obtenerContactos();
-      console.log(response.data);
-    }).catch(error=>{
-      console.log(error.message);
-    });
-
+      await  axios.post(baseUrl+'/create_contact_agent', body ).then(response=>{
+          this.showModalInsertar();
+          this.obtenerContactos();
+          console.log(response.data);
+        }).catch(error=>{
+          console.log(error.message);
+        });
   }
 
   /**Metodo que muestra el formulario de insertar */
@@ -71,6 +76,60 @@ class App extends Component {
     this.setState({formInsertar : !this.state.formInsertar}); 
   }
 
+  /**Meto que obtiene la informacion de la persona que seleccionamos */
+  seleccionarPersona=(persona)=>{
+    this.setState({
+      tipomodal: 'actualizar',
+      forms:{
+        id:persona.person_id, 
+        nombre:  persona.nombre ,
+        apellido:  persona.apellido ,
+        telefono:  persona.telefono ,
+        correo:  persona.correo ,
+        direccion:  persona.direccion ,
+      }
+    })
+    console.log("------------------------------");
+    console.log(this.state.forms);
+    console.log("------------------------------");
+  }
+
+  /** Metodo para que consumo el servicio que edita un contacto
+   *  Crear el objeto que recibe el servicio y lo consume 
+   */
+  updateContact=()=>{
+        /**Estructura del cuerpo que recibe el servicio */
+      const body =  {
+        //datos que se enviaran
+        V_PERSON_ID  :this.state.forms.id,
+        V_NAME : this.state.forms.nombre,
+        V_LAST_NAME :  this.state.forms.apellido,
+        V_TELEFONO :  this.state.forms.telefono, 
+        V_EMAIL: this.state.forms.correo, 
+        V_DIRECCION : this.state.forms.direccion
+      } 
+     axios.put(baseUrl+'/updateContact', body).then(response=>{
+        this.showModalInsertar();
+        this.obtenerContactos();
+        console.log(response.data);
+      }).catch(error=>{
+          console.log(error.message);
+      });
+  }
+
+  deleteContact=()=>{
+    const body =  { 
+      V_PERSON_ID   :this.state.forms.id 
+    } 
+      console.log(body);
+    axios.put(baseUrl+'/delete_person', body).then(response=>{
+      this.setState({modalEliminar: false});
+      this.obtenerContactos();
+      console.log(response.data);
+    }).catch(error=>{
+        console.log(error.message);
+    });
+  }
   /**Detecta los cambios en el formulario de agregar y/o editar
    * Como este metodo se ejecuta en segundo plano es un metodo asyncrono
    */
@@ -96,7 +155,7 @@ class App extends Component {
       <div className="App">
        <br /><br /><br />
          <button className="btn btn-success" 
-                 onClick={()=>this.showModalInsertar()}
+                 onClick={()=>{this.setState({forms:null, tipomodal: 'insertar' }); this.showModalInsertar()}}
           >
           Agregar Contacto</button>
 
@@ -104,8 +163,9 @@ class App extends Component {
       <table className="table ">
         <thead>
           <tr>
-            <th>ID</th>
+            <th>N°</th>
             <th>Nombre</th>
+            <th>Apellido</th>
             <th>Telefono</th>
             <th>Correo</th>
             <th>Direccion</th>
@@ -118,13 +178,14 @@ class App extends Component {
                 <tr>
                   <td>{persona.person_id}</td>
                   <td>{persona.nombre}</td>
-                  <td>{persona.direccion}</td>
-                  <td>{persona.direccion}</td> 
+                  <td>{persona.apellido}</td>
+                  <td>{persona.telefono}</td>
+                  <td>{persona.correo}</td> 
                   <td>{persona.direccion}</td> 
                   <td>
-                      <button className="btn btn-primary">Editar</button>
+                      <button className="btn btn-primary" onClick={()=>{this.seleccionarPersona(persona); this.showModalInsertar()}}>Editar</button>
                       {"   "}
-                      <button className="btn btn-danger">Eliminar</button>
+                      <button className="btn btn-danger" onClick={()=>{this.seleccionarPersona(persona); this.setState({modalEliminar: true})}}>Eliminar</button>
                 </td>
                 </tr>
               )
@@ -139,37 +200,48 @@ class App extends Component {
                 </ModalHeader>
                 <ModalBody>
                   <div className="form-group">
-                    <label htmlFor="id">ID</label>
-                    <input className="form-control" type="text" name="id" id="id" readOnly onChange={this.handleChange} value={forms.id}/>
-                    <br />
+                    <input className="form-control" type="hidden" name="id" id="id" readOnly onChange={this.handleChange} value={forms?forms.id: ''}/>       
                     <label htmlFor="nombre">Nombre</label>
-                    <input className="form-control" type="text" name="nombre" id="nombre" onChange={this.handleChange}  value={forms.nombre}/> 
+                    <input className="form-control" type="text" name="nombre" id="nombre" onChange={this.handleChange}  value={forms?forms.nombre: ''}/> 
                     <br/>
                     <label htmlFor="nombre">Apellido</label>
-                    <input className="form-control" type="text" name="apellido" id="apellido" onChange={this.handleChange}  value={forms.apellido}/> 
+                    <input className="form-control" type="text" name="apellido" id="apellido" onChange={this.handleChange}  value={forms?forms.apellido: ''}/> 
                     <br/>
                     <label htmlFor="nombre">Correo</label>
-                    <input className="form-control" type="mail" name="correo" id="correo" onChange={this.handleChange}  value={forms.correo}/>
+                    <input className="form-control" type="mail" name="correo" id="correo" onChange={this.handleChange}  value={forms?forms.correo: ''}/>
                     <br />
                     <label htmlFor="capital_bursatil">Telefono</label>
-                    <input className="form-control" type="number" name="telefono" id="telefono" onChange={this.handleChange}  value={forms.telefono}/>
+                    <input className="form-control" type="number" name="telefono" id="telefono" onChange={this.handleChange}  value={forms?forms.telefono: ''}/>
                     <br />
                     <label htmlFor="nombre">Dirección</label>
-                    <input className="form-control" type="text" name="direccion" id="direccion"  onChange={this.handleChange}  value={forms.direccion}/> 
+                    <input className="form-control" type="text" name="direccion" id="direccion"  onChange={this.handleChange}  value={forms?forms.direccion: ''}/> 
                   </div>
                 </ModalBody>
                 
                 <ModalFooter>
                  
+                    {this.state.tipomodal==='insertar'?
                       <button className="btn btn-success" onClick={()=>this.insertarPersona()}>
                       Insertar
-                      </button>: <button className="btn btn-primary" onClick={()=>this.peticionPut()}>
+                      </button>: <button className="btn btn-primary" onClick={()=>this.updateContact()}>
                       Actualizar
                       </button>
-                   
+                     }
                     <button className="btn btn-danger" onClick={()=>this.showModalInsertar()}>Cancelar</button>
                 </ModalFooter>
           </Modal>
+
+          <Modal isOpen={this.state.modalEliminar}>
+            <ModalBody>
+               Estás seguro que deseas eliminar al contacto de  {forms && forms.nombre + ' ' + forms.apellido }
+            </ModalBody>
+            <ModalFooter>
+              <button className="btn btn-danger" onClick={()=>this.deleteContact()}>Sí</button>
+              <button className="btn btn-secundary" onClick={()=>this.setState({modalEliminar: false})}>No</button>
+            </ModalFooter>
+          </Modal>
+
+
       </div>
     );
   }
